@@ -1,4 +1,4 @@
-name: Docker Build - 本地构建
+name: Docker Build - 构建并导出镜像
 
 on:
   workflow_dispatch:
@@ -9,54 +9,53 @@ on:
         default: 'latest'
 
 jobs:
-  build-image:
+  build-and-export:
     runs-on: ubuntu-latest
     
     steps:
-      # 步骤 1: 检出你的代码仓库
-      - name: 检出源代码
+      # 步骤 1: 检出源代码
+      - name: 检出代码
         uses: actions/checkout@v4
-        # 这步会将你的 GitHub 仓库代码下载到 GitHub Actions 的虚拟机中
 
-      # 步骤 2: 设置 Docker Buildx (Docker 构建工具)
+      # 步骤 2: 设置 Docker Buildx
       - name: 配置 Docker Buildx
         uses: docker/setup-buildx-action@v3
-        # 这步会安装和配置 Docker Buildx，用于更高效地构建镜像
-        # 它不会拉取任何镜像，只是安装构建工具
 
-      # 步骤 3: 使用你的 Dockerfile 构建镜像
+      # 步骤 3: 构建 Docker 镜像并导出到文件
       - name: 构建 Docker 镜像
         uses: docker/build-push-action@v5
+        id: build
         with:
-          context: .  
-          # 关键点：context: . 表示使用当前目录的 Dockerfile 进行构建
-          # 会从你的 Dockerfile 第一行开始执行，逐步构建镜像
-          
-          push: false  
-          # 关键点：push: false 表示只构建，不推送到任何镜像仓库
-          
+          context: .
+          push: false
           tags: codex-console:${{ github.event.inputs.tag }}
-          # 给构建好的镜像打上标签，例如：codex-console:latest
-          
+          outputs: type=docker,dest=/tmp/codex-console-${{ github.event.inputs.tag }}.tar
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          # 使用 GitHub Actions 缓存加速构建（可选，不影响是否拉取镜像）
-          
-        # 构建过程说明：
-        # 1. 读取你项目根目录的 Dockerfile
-        # 2. 执行 FROM python:3.11-slim (这一步会拉取基础镜像，这是必需的)
-        # 3. 执行 RUN、COPY 等指令，安装依赖、复制代码
-        # 4. 最终生成完整的 Docker 镜像
-        # 
-        # ⚠️ 注意：会拉取 python:3.11-slim 基础镜像
-        # 这是正常的，所有 Docker 构建都需要一个基础镜像作为起点
-        # 之后的所有层都是根据你的 Dockerfile 从头构建的
+          # outputs: type=docker,dest=xxx 表示将镜像导出为 tar 文件
 
-      # 步骤 4: 构建完成确认
-      - name: ✅ 构建成功提示
+      # 步骤 4: 上传镜像文件到 GitHub Artifacts
+      - name: 上传 Docker 镜像文件
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image-${{ github.event.inputs.tag }}
+          path: /tmp/codex-console-${{ github.event.inputs.tag }}.tar
+          retention-days: 7
+          # 镜像文件会保留 7 天，之后自动删除
+          # 你可以在 GitHub Actions 页面手动下载
+
+      # 步骤 5: 显示下载说明
+      - name: ✅ 构建完成提示
         run: |
           echo "==================================="
-          echo "✅ Docker 镜像已构建成功！"
-          echo "镜像标签：codex-console:${{ github.event.inputs.tag }}"
-          echo "状态：仅本地构建，未推送到任何仓库"
+          echo "✅ Docker 镜像已构建并导出成功！"
+          echo ""
+          echo "📦 镜像文件：codex-console-${{ github.event.inputs.tag }}.tar"
+          echo "⬇️  下载方式："
+          echo "   1. 点击上方的 Summary 标签"
+          echo "   2. 在 Artifacts 区域找到 docker-image-${{ github.event.inputs.tag }}"
+          echo "   3. 点击下载按钮即可下载到本地"
+          echo ""
+          echo "💾 文件大小：约 1-2 GB"
+          echo "⏰ 保留时间：7 天"
           echo "==================================="
