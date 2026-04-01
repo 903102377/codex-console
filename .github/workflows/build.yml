@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Docker 镜像标签名 (例如：latest, v1.0)'
+        description: 'codex-console'
         required: false
         default: 'latest'
 
